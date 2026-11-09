@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827"><meta name="description" content="Deriv and TradingView market analysis assistant">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg">
+<title>Synthetic Indices Trader Assistant</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div><div class="eyebrow">MARKET INTELLIGENCE</div><h1>Synthetic Indices Trader Assistant</h1><p class="muted">Deriv synthetic indices · TradingView charts · Manual decisions</p></div><button id="notifyBtn" class="secondary">Enable alerts</button></header>
+<main>
+<section class="toolbar card"><div><label for="asset">Market</label><select id="asset"><option value="boom500">Boom 500</option><option value="boom1000">Boom 1000</option><option value="crash500">Crash 500</option><option value="crash1000">Crash 1000</option><option value="v75">Volatility 75 (V75)</option></select></div><div><label for="tf">Analysis timeframe</label><select id="tf"><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="14400">4 hours</option></select></div><button id="scanBtn">Scan market</button></section>
+<section class="grid">
+ <article class="card price-card"><div class="row"><span class="eyebrow">LIVE DERIV QUOTE</span><span id="connection" class="pill warn">Connecting…</span></div><div id="price" class="price">—</div><div id="priceMeta" class="muted">Waiting for market data</div><div class="small muted" id="symbolMeta">Finding matching Deriv market…</div></article>
+ <article class="card signal-card"><div class="eyebrow">MARKET READ</div><div id="signal" class="signal">Awaiting scan</div><p id="explain" class="muted">The assistant will explain trend, momentum and recent spike activity here.</p><div class="stats"><div><span class="muted">RSI (14)</span><b id="rsi">—</b></div><div><span class="muted">Trend</span><b id="trend">—</b></div><div><span class="muted">ATR (14)</span><b id="atr">—</b></div></div></article>
+</section>
+<section class="card"><div class="row section-head"><div><h2>TradingView chart</h2><p class="muted">Chart view is supplied by TradingView; analysis data below is from Deriv.</p></div><a id="tvLink" target="_blank" rel="noopener">Open chart ↗</a></div><div id="tv_chart" class="chart"></div></section>
+<section class="card"><div class="row section-head"><div><h2>Risk planner</h2><p class="muted">Illustrative levels only — not an instruction to trade.</p></div></div>
+<div class="risk-grid"><div><label for="balance">Account balance (£)</label><input id="balance" type="number" min="0" step="10" value="1000"></div><div><label for="risk">Risk per trade (%)</label><input id="risk" type="number" min="0.1" max="5" step="0.1" value="1"></div><div><label for="entry">Planned entry</label><input id="entry" type="number" step="any" placeholder="Enter your price"></div><div><label for="stop">Stop-loss</label><input id="stop" type="number" step="any" placeholder="Enter stop price"></div></div>
+<div class="risk-result"><div><span class="muted">Maximum planned loss</span><b id="riskCash">£10.00</b></div><div><span class="muted">Price distance to stop</span><b id="distance">—</b></div><div><span class="muted">Position sizing</span><b id="size">Enter entry and stop</b></div></div><p class="small muted">Position sizing is a price-distance calculation only. It does not know your broker’s contract size, tick value, spread, leverage or minimum stake. Confirm the correct lot/contract size with your broker before placing any trade.</p></section>
+<section class="card"><div class="row section-head"><div><h2>Multi-timeframe overview</h2><p class="muted">A setup is stronger when timeframes agree; disagreement means caution.</p></div><button id="allScanBtn" class="secondary">Scan all timeframes</button></div><div id="timeframes" class="tf-list"><div class="muted">No scan yet.</div></div></section>
+<section class="card"><h2>Trade journal</h2><p class="muted">Record your own decisions locally on this device.</p><div class="journal-form"><select id="journalAsset"><option>Boom 500</option><option>Boom 1000</option><option>Crash 500</option><option>Crash 1000</option><option>Volatility 75</option></select><select id="journalSide"><option>Buy</option><option>Sell</option><option>No trade</option></select><input id="journalNote" placeholder="Reason / lesson"><button id="saveJournal">Save</button></div><div id="journalList"></div></section>
+<section class="card disclaimer"><b>Important</b><p>This is a decision-support tool, not a financial adviser or a guaranteed signal service. Synthetic indices are generated markets; external news does not drive their prices, and historical candle patterns do not reliably predict the next spike. Spike monitoring describes past price behaviour only. Check the exact instrument, spread and contract specifications on Deriv. No trades are placed by this app.</p></section>
+</main><footer>Synthetic Indices Trader Assistant · Analysis only · <span id="updated">Not yet updated</span></footer>
+<script src="app.js"></script>
+</body></html>

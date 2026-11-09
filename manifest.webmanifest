@@ -1,0 +1,17 @@
+{
+  "name": "Synthetic Indices Trader Assistant",
+  "short_name": "Synthetic Trader",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#101827",
+  "description": "Deriv and TradingView market analysis assistant",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
