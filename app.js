@@ -11,19 +11,35 @@ let socket, symbols={}, activeAsset='boom500', currentBars={}, allAnalyses={}, l
 const $=id=>document.getElementById(id);
 function setConnection(ok,msg){$('connection').textContent=msg;$('connection').className='pill '+(ok?'good':'warn')}
 function connect(){
- try{socket=new WebSocket(WS_URL);socket.onopen=()=>{setConnection(true,'Deriv connected');socket.send(JSON.stringify({active_symbols:'brief',req_id:1}))};
+ try{socket=new WebSocket(WS_URL);socket.onopen=()=>{setConnection(true,'Deriv connected');socket.send(JSON.stringify({active_symbols:'full',req_id:1}))};
  socket.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch{return}
- if(d.msg_type==='active_symbols'){
-  const list=d.active_symbols||[];
+ if(d.msg_type === 'active_symbols') {
+  const list = d.active_symbols || [];
 
-  const nameOf=x=>(x.underlying_symbol_name||x.display_name||'').toLowerCase();
-  const codeOf=x=>x.underlying_symbol||x.symbol;
+  for (const [k, a] of Object.entries(assets)) {
+    const found = list.find(x => {
+      const name = [
+        x.display_name,
+        x.underlying_symbol_name,
+        x.market_display_name,
+        x.symbol
+      ].filter(Boolean).join(' ').toLowerCase().replace(/[_-]+/g, ' ');
 
-  for(const [k,a] of Object.entries(assets)){
-    let found=list.find(x=>a.terms.some(t=>nameOf(x)===t));
-    if(!found) found=list.find(x=>a.terms.some(t=>nameOf(x).includes(t)));
-    if(found) symbols[k]=codeOf(found);
+      return name.includes(a.label.toLowerCase());
+    });
+
+    if (found) {
+      symbols[k] = found.symbol || found.underlying_symbol;
+    }
   }
+
+  updateSymbolMeta();
+
+  if (symbols[activeAsset]) {
+    loadPrice(activeAsset);
+    scanAll();
+  }
+}
 
   updateSymbolMeta();
   if(symbols[activeAsset]){
