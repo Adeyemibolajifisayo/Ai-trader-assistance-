@@ -183,6 +183,132 @@ function atr(bars, p = 14) {
   return value;
 }
 
+function buildTradeSetup(a) {
+  const price = Number(a.last);
+  const volatility = Number(a.av);
+  const rsiValue = Number(a.rv);
+
+  if (
+    !Number.isFinite(price) ||
+    !Number.isFinite(volatility) ||
+    volatility <= 0 ||
+    !Number.isFinite(rsiValue)
+  ) {
+    return { status: 'WAIT', reason: 'Insufficient market data' };
+  }
+
+  let direction = null;
+
+  if (a.signal === 'Bullish bias') {
+    direction = 'BUY';
+  } else if (a.signal === 'Bearish bias') {
+    direction = 'SELL';
+  }
+
+  if (!direction) {
+    return {
+      status: 'WAIT',
+      reason: 'No clear directional setup'
+    };
+  }
+
+  const sign = direction === 'BUY' ? 1 : -1;
+  const risk = volatility * 1.5;
+
+  return {
+    status: 'CANDIDATE',
+    direction: direction,
+    entry: price,
+    entryLow: price - volatility * 0.25,
+    entryHigh: price + volatility * 0.25,
+    stopLoss: price - sign * risk,
+    tp1: price + sign * risk,
+    tp2: price + sign * risk * 2,
+    tp3: price + sign * risk * 3,
+    riskReward: '1:2',
+    rsi: rsiValue,
+    atr: volatility,
+    reason: 'EMA and RSI directional alignment'
+  };
+}
+
+
+function renderTradeSetup(setup) {
+  const explanation = $('explain');
+
+  if (!explanation) return;
+
+  let panel = $('tradeSetup');
+
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'tradeSetup';
+    panel.style.marginTop = '16px';
+    panel.style.padding = '15px';
+    panel.style.border = '1px solid #34577a';
+    panel.style.borderRadius = '12px';
+    panel.style.lineHeight = '1.8';
+    explanation.after(panel);
+  }
+
+  const fmt = n => Number(n).toFixed(3);
+
+  if (setup.status !== 'CANDIDATE') {
+    panel.innerHTML = `
+      <h3>Trade Setup</h3>
+      <strong style="color:#facc15">
+        WAIT - No clear setup
+      </strong>
+      <p>${setup.reason}</p>
+    `;
+    return;
+  }
+
+  const colour = setup.direction === 'BUY'
+    ? '#22c55e' : '#f87171';
+
+  panel.innerHTML = `
+    <h3>Trade Setup</h3>
+
+    <strong style="color:${colour}">
+      ${setup.direction} CANDIDATE
+    </strong>
+
+    <p>Entry: ${fmt(setup.entry)}</p>
+
+    <p>Entry Zone:
+      ${fmt(setup.entryLow)} -
+      ${fmt(setup.entryHigh)}
+    </p>
+
+    <p style="color:#f87171">
+      Stop Loss: ${fmt(setup.stopLoss)}
+    </p>
+
+    <p style="color:#22c55e">
+      Take Profit 1: ${fmt(setup.tp1)}
+    </p>
+
+    <p style="color:#22c55e">
+      Take Profit 2: ${fmt(setup.tp2)}
+    </p>
+
+    <p style="color:#22c55e">
+      Take Profit 3: ${fmt(setup.tp3)}
+    </p>
+
+    <p>Risk/Reward (TP2): 1:2</p>
+
+    <p style="font-size:12px;opacity:0.8">
+      Illustrative indicator-based setup.
+      Not a confirmed trade or guaranteed
+      outcome. Spikes may cause losses
+      beyond the planned stop.
+    </p>
+  `;
+}
+
+
 function analyse(bars){if(bars.length<40)throw Error('Not enough candles yet');let closes=bars.map(b=>b.close),fast=ema(closes,20),slow=ema(closes,50),rv=rsi(closes),av=atr(bars),last=closes.at(-1),bull=fast.at(-1)>slow.at(-1)&&last>fast.at(-1),bear=fast.at(-1)<slow.at(-1)&&last<fast.at(-1),trend=bull?'Bullish':bear?'Bearish':'Mixed / sideways';let signal=bull&&rv>50&&rv<70?'Bullish bias':bear&&rv<50&&rv>30?'Bearish bias':'Wait / no clear setup';
 let ranges=bars.slice(-51,-1).map(b=>b.high-b.low).sort((a,b)=>a-b);
 let medianRange=ranges.length?ranges[Math.floor(ranges.length/2)]:0;
@@ -192,7 +318,7 @@ let spikeText=`Recent unusually large candles: ${large.length} in the last 30 ca
 let notes=[];notes.push(`Price is ${last>fast.at(-1)?'above':'below'} the 20-period EMA and the 20 EMA is ${fast.at(-1)>slow.at(-1)?'above':'below'} the 50 EMA.`);notes.push(`RSI is ${rv.toFixed(1)} (${rv>70?'overbought territory':rv<30?'oversold territory':'not at an extreme'}).`);notes.push(signal==='Wait / no clear setup'?'Momentum and trend filters do not align cleanly; waiting is the more cautious reading.':'Trend and RSI currently support the same directional bias, but this is not confirmation of a trade.');
 notes.push(spikeText);
 return{last,rv,av,trend,signal,notes:notes.join(' '),bars,upSpikes,downSpikes,largeSpikes:large.length}}
-function render(a,gran){let r=a;let s=$('signal');s.textContent=r.signal;s.className='signal '+(r.signal.startsWith('Bull')?'buy':r.signal.startsWith('Bear')?'sell':'wait');$('explain').textContent=r.notes;$('rsi').textContent=r.rv.toFixed(1);$('trend').textContent=r.trend;$('atr').textContent=r.av.toFixed(5);$('price').textContent=r.last.toLocaleString(undefined,{maximumFractionDigits:5});$('priceMeta').textContent='Latest completed candle · '+new Date(r.bars.at(-1).time*1000).toLocaleString();$('updated').textContent='Updated '+new Date().toLocaleTimeString();updateAlert(r,gran)}
+function render(a,gran){let r=a;let s=$('signal');s.textContent=r.signal;s.className='signal '+(r.signal.startsWith('Bull')?'buy':r.signal.startsWith('Bear')?'sell':'wait');$('explain').textContent=r.notes;$('rsi').textContent=r.rv.toFixed(1);$('trend').textContent=r.trend;$('atr').textContent=r.av.toFixed(5);$('price').textContent=r.last.toLocaleString(undefined,{maximumFractionDigits:5});$('priceMeta').textContent='Latest completed candle · '+new Date(r.bars.at(-1).time*1000).toLocaleString();$('updated').textContent='Updated '+new Date().toLocaleTimeString();updateAlert(r,gran); renderTradeSetup(buildTradeSetup(r)); }
 async function scanOne(gran){let bars=await loadBars(activeAsset,gran),r=analyse(bars);allAnalyses[gran]=r; if(+ $('tf').value===gran)render(r,gran);return r}
 async function scanAll(){if(!symbols[activeAsset]){updateSymbolMeta();return} $('allScanBtn').disabled=true;$('timeframes').innerHTML='<div class="muted">Scanning Deriv candles…</div>';let out=[];for(let t of tfs){try{let r=await scanOne(t.v);out.push({t,r})}catch(e){out.push({t,error:e.message})}}$('timeframes').innerHTML=out.map(x=>`<div class="tf-row"><span>${x.t.n}</span><span>${x.error||x.r.trend+' · '+x.r.signal}</span></div>`).join('');$('allScanBtn').disabled=false; if(allAnalyses[+$('tf').value])render(allAnalyses[+$('tf').value],+$('tf').value)}
 function updateAlert(r,gran){if(!('Notification'in window)||Notification.permission!=='granted')return;let key=activeAsset+gran+r.signal;if(r.signal!=='Wait / no clear setup'&&key!==lastAlertKey){new Notification('AI Trader Assistant · '+assets[activeAsset].label,{body:`${tfs.find(t=>t.v===gran).n}: ${r.signal}. ${r.trend}. Review manually; no trade has been placed.`});lastAlertKey=key}}
