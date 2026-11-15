@@ -119,7 +119,37 @@ function updateSymbolMeta(){$('symbolMeta').textContent=symbols[activeAsset]?'De
 function send(req){return new Promise((resolve,reject)=>{if(!socket||socket.readyState!==1)return reject(Error('Deriv is not connected'));let id=Math.floor(Math.random()*1e9);let handler=e=>{let d=JSON.parse(e.data);if(d.req_id===id){socket.removeEventListener('message',handler);d.error?reject(Error(d.error.message)):resolve(d)}};socket.addEventListener('message',handler);socket.send(JSON.stringify({...req,req_id:id}));setTimeout(()=>{socket.removeEventListener('message',handler);reject(Error('Market data request timed out'))},12000)})}
 async function loadBars(asset,granularity){let sym=symbols[asset];if(!sym)throw Error('No matching Deriv symbol was found for '+assets[asset].label);let d=await send({ticks_history:sym,count:250,end:'latest',style:'candles',granularity});return (d.candles||[]).map(c=>({time:+c.epoch,open:+c.open,high:+c.high,low:+c.low,close:+c.close}));}
 function ema(vals,p){let k=2/(p+1),out=[];vals.forEach((v,i)=>out.push(i? v*k+out[i-1]*(1-k):v));return out}
-function rsi(vals,p=14){if(vals.length<=p)return null;let gains=0,loss=0;for(let i=vals.length-p;i<vals.length;i++){let d=vals[i]-vals[i-1];if(d>0)gains+=d;else loss-=d}if(!loss)return 100;let rs=(gains/p)/(loss/p);return 100-100/(1+rs)}
+
+function rsi(vals, p = 14) {
+  if (vals.length <= p) return null;
+
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= p; i++) {
+    const change = vals[i] - vals[i - 1];
+    gains += Math.max(change, 0);
+    losses += Math.max(-change, 0);
+  }
+
+  let avgGain = gains / p;
+  let avgLoss = losses / p;
+
+  for (let i = p + 1; i < vals.length; i++) {
+    const change = vals[i] - vals[i - 1];
+
+    avgGain = (avgGain * (p - 1) + Math.max(change, 0)) / p;
+    avgLoss = (avgLoss * (p - 1) + Math.max(-change, 0)) / p;
+  }
+
+  if (avgGain === 0 && avgLoss === 0) return 50;
+  if (avgLoss === 0) return 100;
+  if (avgGain === 0) return 0;
+
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
 function atr(bars,p=14){if(bars.length<p+1)return null;let tr=[];for(let i=1;i<bars.length;i++)tr.push(Math.max(bars[i].high-bars[i].low,Math.abs(bars[i].high-bars[i-1].close),Math.abs(bars[i].low-bars[i-1].close)));return tr.slice(-p).reduce((a,b)=>a+b,0)/p}
 function analyse(bars){if(bars.length<40)throw Error('Not enough candles yet');let closes=bars.map(b=>b.close),fast=ema(closes,20),slow=ema(closes,50),rv=rsi(closes),av=atr(bars),last=closes.at(-1),bull=fast.at(-1)>slow.at(-1)&&last>fast.at(-1),bear=fast.at(-1)<slow.at(-1)&&last<fast.at(-1),trend=bull?'Bullish':bear?'Bearish':'Mixed / sideways';let signal=bull&&rv>50&&rv<70?'Bullish bias':bear&&rv<50&&rv>30?'Bearish bias':'Wait / no clear setup';
 let ranges=bars.slice(-51,-1).map(b=>b.high-b.low).sort((a,b)=>a-b);
