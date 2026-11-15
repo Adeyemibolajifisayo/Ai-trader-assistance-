@@ -150,7 +150,39 @@ function rsi(vals, p = 14) {
   return 100 - (100 / (1 + rs));
 }
 
-function atr(bars,p=14){if(bars.length<p+1)return null;let tr=[];for(let i=1;i<bars.length;i++)tr.push(Math.max(bars[i].high-bars[i].low,Math.abs(bars[i].high-bars[i-1].close),Math.abs(bars[i].low-bars[i-1].close)));return tr.slice(-p).reduce((a,b)=>a+b,0)/p}
+
+function atr(bars, p = 14) {
+  if (bars.length < p) return null;
+
+  const tr = [];
+
+  for (let i = 0; i < bars.length; i++) {
+    const high = bars[i].high;
+    const low = bars[i].low;
+
+    if (i === 0) {
+      tr.push(high - low);
+    } else {
+      const prevClose = bars[i - 1].close;
+
+      tr.push(Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      ));
+    }
+  }
+
+  let value = tr.slice(0, p)
+    .reduce((sum, v) => sum + v, 0) / p;
+
+  for (let i = p; i < tr.length; i++) {
+    value = (value * (p - 1) + tr[i]) / p;
+  }
+
+  return value;
+}
+
 function analyse(bars){if(bars.length<40)throw Error('Not enough candles yet');let closes=bars.map(b=>b.close),fast=ema(closes,20),slow=ema(closes,50),rv=rsi(closes),av=atr(bars),last=closes.at(-1),bull=fast.at(-1)>slow.at(-1)&&last>fast.at(-1),bear=fast.at(-1)<slow.at(-1)&&last<fast.at(-1),trend=bull?'Bullish':bear?'Bearish':'Mixed / sideways';let signal=bull&&rv>50&&rv<70?'Bullish bias':bear&&rv<50&&rv>30?'Bearish bias':'Wait / no clear setup';
 let ranges=bars.slice(-51,-1).map(b=>b.high-b.low).sort((a,b)=>a-b);
 let medianRange=ranges.length?ranges[Math.floor(ranges.length/2)]:0;
