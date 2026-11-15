@@ -10,49 +10,111 @@ const tfs=[{v:900,n:'15m'},{v:3600,n:'1h'},{v:14400,n:'4h'}];
 let socket, symbols={}, activeAsset='boom500', currentBars={}, allAnalyses={}, lastAlertKey='';
 const $=id=>document.getElementById(id);
 function setConnection(ok,msg){$('connection').textContent=msg;$('connection').className='pill '+(ok?'good':'warn')}
-function connect(){
- try{socket=new WebSocket(WS_URL);socket.onopen=()=>{setConnection(true,'Deriv connected');socket.send(JSON.stringify({active_symbols:'full',req_id:1}))};
- socket.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch{return}
- if(d.msg_type === 'active_symbols') {
-  const list = d.active_symbols || [];
 
-  for (const [k, a] of Object.entries(assets)) {
-    const found = list.find(x => {
-      const name = [
-        x.display_name,
-        x.underlying_symbol_name,
-        x.market_display_name,
-        x.symbol
-      ].filter(Boolean).join(' ').toLowerCase().replace(/[_-]+/g, ' ');
+function connect() {
+  try {
+    socket = new WebSocket(WS_URL);
 
-      return name.includes(a.label.toLowerCase());
-    });
+    socket.onopen = () => {
+      setConnection(true, 'Deriv connected');
 
-    if (found) {
-      symbols[k] = found.symbol || found.underlying_symbol;
-    }
-  }
+      socket.send(JSON.stringify({
+        active_symbols: 'brief',
+        req_id: 1
+      }));
+    };
 
-  updateSymbolMeta();
+    socket.onmessage = e => {
+      let d;
 
-  if (symbols[activeAsset]) {
-    loadPrice(activeAsset);
-    scanAll();
+      try {
+        d = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+
+      if (d.error) {
+        setConnection(false, 'Data error');
+        $('priceMeta').textContent =
+          d.error.message || 'Market data error';
+        return;
+      }
+
+      if (d.msg_type === 'active_symbols') {
+        const list = d.active_symbols || [];
+
+        const codes = {
+          boom500: 'BOOM500',
+          boom1000: 'BOOM1000',
+          crash500: 'CRASH500',
+          crash1000: 'CRASH1000',
+          v75: 'R_75'
+        };
+
+        for (const [k, a] of Object.entries(assets)) {
+          const code = x =>
+            x.underlying_symbol || x.symbol;
+
+          const name = x =>
+            String(
+              x.underlying_symbol_name ||
+              x.display_name || ''
+            ).toLowerCase().trim();
+
+          const found =
+            list.find(x => code(x) === codes[k]) ||
+            list.find(x => a.terms.includes(name(x)));
+
+          if (found && code(found)) {
+            symbols[k] = code(found);
+          }
+        }
+
+        updateSymbolMeta();
+
+        if (symbols[activeAsset]) {
+          loadPrice(activeAsset);
+          scanAll();
+        }
+      }
+
+      if (d.msg_type === 'tick') {
+        const k = Object.keys(symbols).find(
+          k => symbols[k] === (
+            d.tick?.symbol ||
+            d.tick?.underlying_symbol
+          )
+        );
+
+        if (k === activeAsset) {
+          $('price').textContent =
+            Number(d.tick.quote).toLocaleString(
+              undefined,
+              { maximumFractionDigits: 5 }
+            );
+
+          $('priceMeta').textContent =
+            'Live tick · ' +
+            new Date(
+              d.tick.epoch * 1000
+            ).toLocaleTimeString();
+        }
+      }
+    };
+
+    socket.onerror = () =>
+      setConnection(false, 'Connection issue');
+
+    socket.onclose = () => {
+      setConnection(false, 'Disconnected');
+      setTimeout(connect, 5000);
+    };
+
+  } catch (e) {
+    setConnection(false, 'Unavailable');
   }
 }
 
-  updateSymbolMeta();
-  if(symbols[activeAsset]){
-    loadPrice(activeAsset);
-    scanAll();
-  }
-}
- if(d.msg_type==='tick'){let k=Object.keys(symbols).find(k=>symbols[k]===d.tick?.symbol);if(k===activeAsset){$('price').textContent=Number(d.tick.quote).toLocaleString(undefined,{maximumFractionDigits:5});$('priceMeta').textContent='Live tick · '+new Date(d.tick.epoch*1000).toLocaleTimeString();}}
- if(d.error){setConnection(false,'Data error');$('priceMeta').textContent=d.error.message||'Market data error';}
- };
- socket.onerror=()=>setConnection(false,'Connection issue');socket.onclose=()=>{setConnection(false,'Disconnected');setTimeout(connect,5000)};
- }catch(e){setConnection(false,'Unavailable')}
-}
 function updateSymbolMeta(){$('symbolMeta').textContent=symbols[activeAsset]?'Deriv symbol: '+symbols[activeAsset]:'No matching Deriv symbol found. Check market availability on Deriv.'}
 function send(req){return new Promise((resolve,reject)=>{if(!socket||socket.readyState!==1)return reject(Error('Deriv is not connected'));let id=Math.floor(Math.random()*1e9);let handler=e=>{let d=JSON.parse(e.data);if(d.req_id===id){socket.removeEventListener('message',handler);d.error?reject(Error(d.error.message)):resolve(d)}};socket.addEventListener('message',handler);socket.send(JSON.stringify({...req,req_id:id}));setTimeout(()=>{socket.removeEventListener('message',handler);reject(Error('Market data request timed out'))},12000)})}
 async function loadBars(asset,granularity){let sym=symbols[asset];if(!sym)throw Error('No matching Deriv symbol was found for '+assets[asset].label);let d=await send({ticks_history:sym,count:250,end:'latest',style:'candles',granularity});return (d.candles||[]).map(c=>({time:+c.epoch,open:+c.open,high:+c.high,low:+c.low,close:+c.close}));}
