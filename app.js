@@ -46,8 +46,7 @@ function connect(){
     loadPrice(activeAsset);
     scanAll();
   }
-}{const list=d.active_symbols||[];for(const [k,a] of Object.entries(assets)){let found=list.find(x=>a.terms.some(t=>(x.display_name||'').toLowerCase()===t));if(!found)found=list.find(x=>a.terms.some(t=>(x.display_name||'').toLowerCase().includes(t)));if(found)symbols[k]=found.symbol;}
- updateSymbolMeta();if(symbols[activeAsset]){loadPrice(activeAsset);scanAll();}}
+}
  if(d.msg_type==='tick'){let k=Object.keys(symbols).find(k=>symbols[k]===d.tick?.symbol);if(k===activeAsset){$('price').textContent=Number(d.tick.quote).toLocaleString(undefined,{maximumFractionDigits:5});$('priceMeta').textContent='Live tick · '+new Date(d.tick.epoch*1000).toLocaleTimeString();}}
  if(d.error){setConnection(false,'Data error');$('priceMeta').textContent=d.error.message||'Market data error';}
  };
