@@ -9,6 +9,29 @@
 <body>
 <header><div><div class="eyebrow">MARKET INTELLIGENCE</div><h1>Synthetic Indices Trader Assistant</h1><p class="muted">Deriv synthetic indices · TradingView charts · Manual decisions</p></div><button id="notifyBtn" class="secondary">Enable alerts</button></header>
 <main>
+ 
+<section class="card" id="marketScanner">
+  <div class="section-head">
+    <div>
+      <h2>Automatic Market Scanner</h2>
+      <p>Monitor all five synthetic indices.</p>
+    </div>
+    <button id="scanMarketsBtn">Scan all markets</button>
+  </div>
+
+  <p id="scannerStatus">Ready to scan</p>
+
+  <div id="scannerResults">
+    <p>Boom 500 — Waiting...</p>
+    <p>Boom 1000 — Waiting...</p>
+    <p>Crash 500 — Waiting...</p>
+    <p>Crash 1000 — Waiting...</p>
+    <p>Volatility 75 — Waiting...</p>
+  </div>
+
+  <p id="scannerUpdated">Last scan: Not yet scanned</p>
+</section>
+
 <section class="toolbar card"><div><label for="asset">Market</label><select id="asset"><option value="boom500">Boom 500</option><option value="boom1000">Boom 1000</option><option value="crash500">Crash 500</option><option value="crash1000">Crash 1000</option><option value="v75">Volatility 75 (V75)</option></select></div><div><label for="tf">Analysis timeframe</label><select id="tf"><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="14400">4 hours</option></select></div><button id="scanBtn">Scan market</button></section>
 <section class="grid">
  <article class="card price-card"><div class="row"><span class="eyebrow">LIVE DERIV QUOTE</span><span id="connection" class="pill warn">Connecting…</span></div><div id="price" class="price">—</div><div id="priceMeta" class="muted">Waiting for market data</div><div class="small muted" id="symbolMeta">Finding matching Deriv market…</div></article>
