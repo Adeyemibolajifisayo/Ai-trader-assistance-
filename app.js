@@ -752,3 +752,243 @@ if (opportunityScanner && opportunityStatus) {
 
 }
 
+
+/* TRADE ENTRY ASSISTANT */
+
+let entryScanVersion = 0;
+let entryScanTimer;
+
+async function updateEntryAssistant() {
+  const results = $('entryResults');
+  const updated = $('entryUpdated');
+  const status = $('scannerStatus');
+  const opportunities = $('opportunityResults');
+
+  if (!results || !updated ||
+      !status || !opportunities) return;
+
+  const version = ++entryScanVersion;
+
+  if (!socket || socket.readyState !== 1) {
+    results.textContent =
+      'WAIT - Deriv is not connected.';
+    return;
+  }
+
+  if (!status.textContent.includes(
+    'Market scan complete'
+  )) {
+    results.textContent =
+      'Waiting for market scan to finish...';
+    return;
+  }
+
+  results.textContent =
+    'Checking entry levels...';
+
+  const candidates = Object.entries(assets)
+    .filter(([key, asset]) =>
+      opportunities.textContent.includes(
+        asset.label
+      )
+    );
+
+  const cards = [];
+
+  for (const [key, asset] of candidates) {
+    try {
+      const checks = [];
+
+      for (const tf of tfs) {
+        const bars = await loadBars(key, tf.v);
+
+        const closed = bars.filter(b =>
+          b.time + tf.v <= Date.now() / 1000
+        );
+
+        if (closed.length < 50) {
+          throw new Error('Insufficient candles');
+        }
+
+        checks.push({
+          tf: tf.v,
+          data: analyse(closed)
+        });
+      }
+
+      if (version !== entryScanVersion) return;
+
+      const bullish = checks.every(x =>
+        x.data.signal === 'Bullish bias'
+      );
+
+      const bearish = checks.every(x =>
+        x.data.signal === 'Bearish bias'
+      );
+
+      if (!bullish && !bearish) continue;
+
+      const a = checks.find(
+        x => x.tf === 900
+      ).data;
+
+      const entry = Number(a.last);
+      const volatility = Number(a.av);
+
+      const candleTime =
+        a.bars[a.bars.length - 1].time;
+
+      if (Date.now() / 1000 -
+          candleTime > 1800) continue;
+
+      if (!Number.isFinite(entry) ||
+          !Number.isFinite(volatility) ||
+          volatility <= 0) continue;
+
+      const direction = bullish ? 'BUY' : 'SELL';
+      const sign = bullish ? 1 : -1;
+      const risk = volatility * 1.5;
+
+      const stop = entry - sign * risk;
+      const tp1 = entry + sign * risk;
+      const tp2 = entry + sign * risk * 2;
+
+      if (Math.min(entry, stop, tp1, tp2) <= 0)
+        continue;
+
+      const colour = bullish
+        ? '#22c55e' : '#f87171';
+
+      const fmt = n => Number(n).toFixed(4);
+
+      cards.push(`
+        <div style="
+          border:1px solid ${colour};
+          border-radius:12px;
+          padding:16px;
+          margin:12px 0;
+          line-height:1.8;
+        ">
+          <h3>${asset.label}</h3>
+
+          <strong style="color:${colour}">
+            ${direction} CANDIDATE - 3/3
+          </strong>
+
+          <p>Reference entry:
+            <b>${fmt(entry)}</b>
+          </p>
+
+          <p style="color:#f87171">
+            Stop loss: ${fmt(stop)}
+          </p>
+
+          <p style="color:#22c55e">
+            Take profit 1: ${fmt(tp1)}
+          </p>
+
+          <p style="color:#22c55e">
+            Take profit 2: ${fmt(tp2)}
+          </p>
+
+          <p>Risk-to-reward TP1: 1:1</p>
+          <p>Risk-to-reward TP2: 1:2</p>
+
+          <p>15m ATR: ${fmt(volatility)}</p>
+
+          <p class="muted">
+            15m, 1h and 4h aligned
+            on completed candles.
+          </p>
+
+          <p class="muted">
+            Reference candle:
+            ${new Date(
+              candleTime * 1000
+            ).toLocaleString()}
+          </p>
+
+          <button onclick="
+            $('asset').value='${key}';
+            $('asset').dispatchEvent(
+              new Event('change')
+            );
+            $('asset').scrollIntoView({
+              behavior:'smooth'
+            });
+          ">
+            Review market
+          </button>
+
+          <p class="muted">
+            Planning levels only.
+            Check live price, spread and
+            contract specifications.
+            Spikes can exceed stop losses.
+          </p>
+        </div>
+      `);
+
+    } catch (error) {
+      cards.push(`
+        <p>${asset.label}:
+        Unable to verify entry levels.</p>
+      `);
+    }
+  }
+
+  if (version !== entryScanVersion) return;
+
+  if (!socket || socket.readyState !== 1) {
+    results.textContent =
+      'WAIT - Connection lost.';
+    return;
+  }
+
+  results.innerHTML = cards.length
+    ? cards.join('')
+    : '<p>WAIT - No verified 3/3 setup.</p>';
+
+  updated.textContent =
+    'Last updated: ' +
+    new Date().toLocaleTimeString();
+}
+
+function scheduleEntryAssistant() {
+  entryScanVersion++;
+  clearTimeout(entryScanTimer);
+
+  if ($('entryResults')) {
+    $('entryResults').textContent =
+      'Checking latest market scan...';
+  }
+
+  entryScanTimer = setTimeout(
+    updateEntryAssistant, 500
+  );
+}
+
+if ($('scannerStatus') &&
+    $('opportunityResults') &&
+    $('entryResults')) {
+
+  const entryObserver = new MutationObserver(
+    scheduleEntryAssistant
+  );
+
+  entryObserver.observe($('scannerStatus'), {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+
+  entryObserver.observe($('opportunityResults'), {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+
+  scheduleEntryAssistant();
+}
+
+
