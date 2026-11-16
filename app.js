@@ -197,7 +197,34 @@ function buildTradeSetup(a) {
     return { status: 'WAIT', reason: 'Insufficient market data' };
   }
 
-  let direction = null;
+   const confirmations = tfs.map(t => allAnalyses[t.v]);
+
+  if (confirmations.some(r => !r)) {
+    return {
+      status: 'WAIT',
+      reason: 'Scan all three timeframes first'
+    };
+  }
+
+  const allBullish = confirmations.every(
+    r => r.signal === 'Bullish bias'
+  );
+
+  const allBearish = confirmations.every(
+    r => r.signal === 'Bearish bias'
+  );
+
+  if (
+    (a.signal === 'Bullish bias' && !allBullish) ||
+    (a.signal === 'Bearish bias' && !allBearish) ||
+    (!allBullish && !allBearish)
+  ) {
+    return {
+      status: 'WAIT',
+      reason: 'Full timeframe confirmation required (3/3)'
+    };
+  }
+ let direction = null;
 
   if (a.signal === 'Bullish bias') {
     direction = 'BUY';
@@ -319,7 +346,25 @@ let notes=[];notes.push(`Price is ${last>fast.at(-1)?'above':'below'} the 20-per
 notes.push(spikeText);
 return{last,rv,av,trend,signal,notes:notes.join(' '),bars,upSpikes,downSpikes,largeSpikes:large.length}}
 function render(a,gran){let r=a;let s=$('signal');s.textContent=r.signal;s.className='signal '+(r.signal.startsWith('Bull')?'buy':r.signal.startsWith('Bear')?'sell':'wait');$('explain').textContent=r.notes;$('rsi').textContent=r.rv.toFixed(1);$('trend').textContent=r.trend;$('atr').textContent=r.av.toFixed(5);$('price').textContent=r.last.toLocaleString(undefined,{maximumFractionDigits:5});$('priceMeta').textContent='Latest completed candle · '+new Date(r.bars.at(-1).time*1000).toLocaleString();$('updated').textContent='Updated '+new Date().toLocaleTimeString();updateAlert(r,gran); renderTradeSetup(buildTradeSetup(r)); }
-async function scanOne(gran){let bars=await loadBars(activeAsset,gran),r=analyse(bars);allAnalyses[gran]=r; if(+ $('tf').value===gran)render(r,gran);return r}
+
+async function scanOne(gran) {
+  const scanAsset = activeAsset;
+  let bars = await loadBars(scanAsset, gran);
+
+  if (scanAsset !== activeAsset) {
+    throw new Error('Market changed during scan');
+  }
+
+  let r = analyse(bars);
+  allAnalyses[gran] = r;
+
+  if (+$('tf').value === gran) {
+    render(r, gran);
+  }
+
+  return r;
+}
+
 async function scanAll() {
   if (!symbols[activeAsset]) {
     updateSymbolMeta();
@@ -394,7 +439,7 @@ function loadChart(){let a=assets[activeAsset],tf=+$('tf').value,interval=tf===9
 function updateRisk(){let b=+$('balance').value||0,p=+$('risk').value||0,entry=+$('entry').value,stop=+$('stop').value;$('riskCash').textContent='£'+(b*p/100).toFixed(2);if(entry>0&&stop>0&&entry!==stop){$('distance').textContent=Math.abs(entry-stop).toPrecision(6);$('size').textContent=(b*p/100/Math.abs(entry-stop)).toFixed(4)+' price-units*'}else{$('distance').textContent='—';$('size').textContent='Enter entry and stop'}}
 function journal(){let items=JSON.parse(localStorage.getItem('traderJournal')||'[]');$('journalList').innerHTML=items.slice().reverse().map(x=>`<div class="journal-item"><b>${escapeHtml(x.asset)} · ${escapeHtml(x.side)}</b> <span class="muted">${escapeHtml(x.date)}</span><div>${escapeHtml(x.note)}</div></div>`).join('')||'<p class="muted small">No journal entries yet.</p>'}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-$('asset').onchange=()=>{activeAsset=$('asset').value;updateSymbolMeta();loadChart();if(symbols[activeAsset]){loadPrice(activeAsset);scanAll()}};
+$('asset').onchange=()=>{ activeAsset=$('asset').value;allAnalyses={};currentBars={};lastAlertKey='';renderTradeSetup({status:'WAIT',reason:'Scanning new market'});updateSymbolMeta();loadChart();if(symbols[activeAsset]){loadPrice(activeAsset);scanAll()}};
 $('tf').onchange=()=>{loadChart();if(allAnalyses[+$('tf').value])render(allAnalyses[+$('tf').value],+$('tf').value);else scanOne(+$('tf').value).catch(e=>$('explain').textContent=e.message)};
 $('scanBtn').onclick=()=>scanOne(+$('tf').value).catch(e=>$('explain').textContent=e.message);
 $('allScanBtn').onclick=scanAll;
