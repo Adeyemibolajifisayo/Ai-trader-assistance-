@@ -320,7 +320,75 @@ notes.push(spikeText);
 return{last,rv,av,trend,signal,notes:notes.join(' '),bars,upSpikes,downSpikes,largeSpikes:large.length}}
 function render(a,gran){let r=a;let s=$('signal');s.textContent=r.signal;s.className='signal '+(r.signal.startsWith('Bull')?'buy':r.signal.startsWith('Bear')?'sell':'wait');$('explain').textContent=r.notes;$('rsi').textContent=r.rv.toFixed(1);$('trend').textContent=r.trend;$('atr').textContent=r.av.toFixed(5);$('price').textContent=r.last.toLocaleString(undefined,{maximumFractionDigits:5});$('priceMeta').textContent='Latest completed candle · '+new Date(r.bars.at(-1).time*1000).toLocaleString();$('updated').textContent='Updated '+new Date().toLocaleTimeString();updateAlert(r,gran); renderTradeSetup(buildTradeSetup(r)); }
 async function scanOne(gran){let bars=await loadBars(activeAsset,gran),r=analyse(bars);allAnalyses[gran]=r; if(+ $('tf').value===gran)render(r,gran);return r}
-async function scanAll(){if(!symbols[activeAsset]){updateSymbolMeta();return} $('allScanBtn').disabled=true;$('timeframes').innerHTML='<div class="muted">Scanning Deriv candles…</div>';let out=[];for(let t of tfs){try{let r=await scanOne(t.v);out.push({t,r})}catch(e){out.push({t,error:e.message})}}$('timeframes').innerHTML=out.map(x=>`<div class="tf-row"><span>${x.t.n}</span><span>${x.error||x.r.trend+' · '+x.r.signal}</span></div>`).join('');$('allScanBtn').disabled=false; if(allAnalyses[+$('tf').value])render(allAnalyses[+$('tf').value],+$('tf').value)}
+async function scanAll() {
+  if (!symbols[activeAsset]) {
+    updateSymbolMeta();
+    return;
+  }
+
+  $('allScanBtn').disabled = true;
+  $('timeframes').innerHTML =
+    '<div class="muted">Scanning Deriv candles...</div>';
+
+  let out = [];
+
+  for (let t of tfs) {
+    try {
+      let r = await scanOne(t.v);
+      out.push({ t, r });
+    } catch (e) {
+      out.push({ t, error: e.message });
+    }
+  }
+
+  $('timeframes').innerHTML = out.map(x =>
+    `<div class="tf-row">
+      <span>${x.t.n}</span>
+      <span>${x.error || x.r.trend + ' · ' + x.r.signal}</span>
+    </div>`
+  ).join('');
+
+  let bullish = out.filter(x =>
+    x.r && x.r.signal === 'Bullish bias'
+  ).length;
+
+  let bearish = out.filter(x =>
+    x.r && x.r.signal === 'Bearish bias'
+  ).length;
+
+  let consensus = 'WAIT - Timeframes disagree';
+  let colour = '#f59e0b';
+
+  if (bullish === 3) {
+    consensus = 'BULLISH ALIGNMENT - 3/3';
+    colour = '#22c55e';
+  } else if (bearish === 3) {
+    consensus = 'BEARISH ALIGNMENT - 3/3';
+    colour = '#ef4444';
+  } else if (bullish === 2) {
+    consensus = 'PARTIAL BULLISH ALIGNMENT - 2/3';
+  } else if (bearish === 2) {
+    consensus = 'PARTIAL BEARISH ALIGNMENT - 2/3';
+  }
+
+  $('timeframes').innerHTML += `
+    <div style="padding:15px;margin-top:12px;
+      border:1px solid ${colour};
+      border-radius:10px;color:${colour};
+      font-weight:bold;">
+      ${consensus}
+    </div>
+  `;
+
+  $('allScanBtn').disabled = false;
+
+  if (allAnalyses[+$('tf').value]) {
+    render(
+      allAnalyses[+$('tf').value],
+      +$('tf').value
+    );
+  }
+}
 function updateAlert(r,gran){if(!('Notification'in window)||Notification.permission!=='granted')return;let key=activeAsset+gran+r.signal;if(r.signal!=='Wait / no clear setup'&&key!==lastAlertKey){new Notification('AI Trader Assistant · '+assets[activeAsset].label,{body:`${tfs.find(t=>t.v===gran).n}: ${r.signal}. ${r.trend}. Review manually; no trade has been placed.`});lastAlertKey=key}}
 function loadChart(){let a=assets[activeAsset],tf=+$('tf').value,interval=tf===900?'15':tf===3600?'60':'240';$('tvLink').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(a.tv);$('tv_chart').innerHTML=`<iframe title="TradingView chart" src="https://s.tradingview.com/widgetembed/?frameElementId=tv_chart&symbol=${encodeURIComponent(a.tv)}&interval=${interval}&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=%23131e30&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1&studies=RSI%40tv-basicstudies" loading="lazy"></iframe>`}
 function updateRisk(){let b=+$('balance').value||0,p=+$('risk').value||0,entry=+$('entry').value,stop=+$('stop').value;$('riskCash').textContent='£'+(b*p/100).toFixed(2);if(entry>0&&stop>0&&entry!==stop){$('distance').textContent=Math.abs(entry-stop).toPrecision(6);$('size').textContent=(b*p/100/Math.abs(entry-stop)).toFixed(4)+' price-units*'}else{$('distance').textContent='—';$('size').textContent='Enter entry and stop'}}
