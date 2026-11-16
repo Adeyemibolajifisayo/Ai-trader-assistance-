@@ -451,3 +451,123 @@ if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serv
 loadChart();updateRisk();journal();connect();
 // Refresh all three timeframes every 60 seconds while the app remains open.
 setInterval(()=>{if(document.visibilityState==='visible'&&symbols[activeAsset])scanAll().catch(()=>{});},60000);
+
+/* AUTOMATIC MULTI-MARKET SCANNER */
+
+let marketScannerRunning = false;
+
+async function scanAllMarkets() {
+  if (marketScannerRunning) return;
+
+  const button = $('scanMarketsBtn');
+  const status = $('scannerStatus');
+  const results = $('scannerResults');
+  const updated = $('scannerUpdated');
+
+  if (!button || !status || !results || !updated) return;
+
+  if (!socket || socket.readyState !== 1) {
+    status.textContent = 'Waiting for Deriv connection...';
+    return;
+  }
+
+  marketScannerRunning = true;
+  button.disabled = true;
+  status.textContent = 'Scanning all 5 markets...';
+  results.innerHTML = '';
+
+  try {
+    for (const [key, asset] of Object.entries(assets)) {
+
+      const row = document.createElement('div');
+
+      row.style.padding = '14px';
+      row.style.marginBottom = '8px';
+      row.style.border = '1px solid #34577a';
+      row.style.borderRadius = '10px';
+
+      row.textContent = asset.label + ' - Scanning...';
+      results.appendChild(row);
+
+      try {
+        const readings = [];
+
+        for (const tf of tfs) {
+          const bars = await loadBars(key, tf.v);
+          const reading = analyse(bars);
+
+          readings.push({
+            timeframe: tf.n,
+            signal: reading.signal
+          });
+        }
+
+        const bulls = readings.filter(
+          r => r.signal === 'Bullish bias'
+        ).length;
+
+        const bears = readings.filter(
+          r => r.signal === 'Bearish bias'
+        ).length;
+
+        let decision = 'WAIT';
+        let colour = '#f59e0b';
+
+        if (bulls === 3) {
+          decision = 'BUY CANDIDATE - 3/3';
+          colour = '#22c55e';
+        } else if (bears === 3) {
+          decision = 'SELL CANDIDATE - 3/3';
+          colour = '#ef4444';
+        } else if (bulls === 2) {
+          decision = 'PARTIAL BULLISH - 2/3';
+        } else if (bears === 2) {
+          decision = 'PARTIAL BEARISH - 2/3';
+        }
+
+        row.innerHTML = `
+          <strong>${asset.label}</strong>
+          <p style="color:${colour};font-weight:bold;">
+            ${decision}
+          </p>
+          <p style="font-size:13px;">
+            ${readings.map(r =>
+              r.timeframe + ': ' + r.signal
+            ).join(' | ')}
+          </p>
+        `;
+
+      } catch (error) {
+        row.textContent =
+          asset.label + ' - Data unavailable';
+      }
+    }
+
+    status.textContent = 'Market scan complete';
+
+    updated.textContent =
+      'Last scan: ' + new Date().toLocaleTimeString();
+
+  } finally {
+    marketScannerRunning = false;
+    button.disabled = false;
+  }
+}
+
+if ($('scanMarketsBtn')) {
+  $('scanMarketsBtn').onclick = scanAllMarkets;
+}
+
+// Automatically scan every 2 minutes.
+setInterval(() => {
+  if (
+    document.visibilityState === 'visible' &&
+    socket &&
+    socket.readyState === 1
+  ) {
+    scanAllMarkets();
+  }
+}, 120000);
+
+// Initial scan after connection.
+setTimeout(scanAllMarkets, 10000);
