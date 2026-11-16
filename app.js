@@ -571,3 +571,184 @@ setInterval(() => {
 
 // Initial scan after connection.
 setTimeout(scanAllMarkets, 10000);
+
+
+// =====================================
+// MARKET OPPORTUNITY CENTRE
+// =====================================
+
+let previousOpportunities = new Set();
+
+function updateOpportunityCentre() {
+
+  const scanner = $('scannerResults');
+  const status = $('scannerStatus');
+  const output = $('opportunityResults');
+  const updated = $('opportunityUpdated');
+
+  if (!scanner || !status || !output || !updated) return;
+
+  if (!status.textContent.includes('Market scan complete')) {
+    output.textContent = 'Waiting for completed market scan...';
+    return;
+  }
+
+  const markets = [
+    'Boom 500',
+    'Boom 1000',
+    'Crash 500',
+    'Crash 1000',
+    'Volatility 75'
+  ];
+
+  const text = scanner.textContent;
+  const opportunities = [];
+
+  markets.forEach((market, index) => {
+
+    const start = text.indexOf(market);
+
+    if (start === -1) return;
+
+    const next = index < markets.length - 1
+      ? text.indexOf(markets[index + 1], start + market.length)
+      : -1;
+
+    const section = next === -1
+      ? text.slice(start)
+      : text.slice(start, next);
+
+    if (/BUY CANDIDATE\s*[-–—]\s*3\/3/i.test(section)) {
+      opportunities.push({
+        market: market,
+        direction: 'BUY',
+        colour: '#22c55e'
+      });
+    }
+
+    if (/SELL CANDIDATE\s*[-–—]\s*3\/3/i.test(section)) {
+      opportunities.push({
+        market: market,
+        direction: 'SELL',
+        colour: '#ef4444'
+      });
+    }
+
+  });
+
+  output.innerHTML = '';
+
+  if (opportunities.length === 0) {
+
+    output.innerHTML = `
+      <div style="padding:15px;
+                  border:1px solid #f59e0b;
+                  border-radius:10px;
+                  color:#f59e0b;">
+        <strong>WAIT - No fully aligned candidates</strong>
+        <p>Monitoring all five markets for 3/3 alignment.</p>
+      </div>
+    `;
+
+  } else {
+
+    opportunities.forEach(item => {
+
+      const card = document.createElement('div');
+
+      card.style.cssText = `
+        border:1px solid ${item.colour};
+        border-radius:10px;
+        padding:15px;
+        margin-bottom:10px;
+      `;
+
+      card.innerHTML = `
+        <h3>${item.market}</h3>
+        <strong style="color:${item.colour}">
+          ${item.direction} CANDIDATE - 3/3
+        </strong>
+        <p>15m, 1h and 4h are fully aligned.</p>
+        <small>Review chart and risk before trading.</small>
+      `;
+
+      output.appendChild(card);
+
+      const key = item.market + ':' + item.direction;
+
+      if (!previousOpportunities.has(key)) {
+        sendOpportunityAlert(item);
+      }
+
+    });
+
+  }
+
+  previousOpportunities = new Set(
+    opportunities.map(item =>
+      item.market + ':' + item.direction
+    )
+  );
+
+  updated.textContent =
+    'Last updated: ' + new Date().toLocaleTimeString();
+
+}
+
+async function sendOpportunityAlert(item) {
+
+  if (!('Notification' in window)) return;
+
+  if (Notification.permission !== 'granted') return;
+
+  const title = item.market + ' - ' + item.direction + ' Candidate';
+
+  const options = {
+    body: '3/3 timeframe alignment detected. Review your chart and risk.',
+    tag: 'opportunity-' + item.market
+  };
+
+  try {
+
+    const registration =
+      await navigator.serviceWorker?.getRegistration();
+
+    if (registration) {
+      await registration.showNotification(title, options);
+    } else {
+      new Notification(title, options);
+    }
+
+  } catch (error) {
+    console.log('Opportunity alert unavailable:', error);
+  }
+
+}
+
+// Monitor the existing scanner for completed scans.
+
+const opportunityScanner = $('scannerResults');
+const opportunityStatus = $('scannerStatus');
+
+if (opportunityScanner && opportunityStatus) {
+
+  const opportunityObserver = new MutationObserver(() => {
+    updateOpportunityCentre();
+  });
+
+  opportunityObserver.observe(opportunityScanner, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+
+  opportunityObserver.observe(opportunityStatus, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+
+  updateOpportunityCentre();
+
+}
+
