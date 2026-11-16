@@ -999,3 +999,29 @@ if ($('scannerStatus') &&
 }
 
 
+
+function updateSmartEntryAssistant() {
+  const results = document.getElementById('smartEntryResults');
+  const updated = document.getElementById('smartEntryUpdated');
+
+  if (!results || !updated) return;
+
+  const entry = document.getElementById('entryResults');
+  const entryText = entry?.innerText?.trim() || '';
+
+  if (!entryText || /checking entry levels/i.test(entryText)) {
+    results.textContent = 'Waiting for completed market analysis...';
+  } else if (/BUY CANDIDATE|SELL CANDIDATE/i.test(entryText)) {
+    results.textContent =
+      'Potential setup detected. Review the Trade Entry Assistant levels and confirm the current live price, candle structure and risk before making any decision. This is not an independent entry confirmation.';
+  } else {
+    results.textContent =
+      'No confirmed entry setup. Continue monitoring market conditions.';
+  }
+
+  updated.textContent =
+    'Last updated: ' + new Date().toLocaleTimeString();
+}
+
+updateSmartEntryAssistant();
+setInterval(updateSmartEntryAssistant, 15000);
