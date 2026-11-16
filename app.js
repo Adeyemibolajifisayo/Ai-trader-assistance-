@@ -754,7 +754,9 @@ if (opportunityScanner && opportunityStatus) {
 
 
 /* TRADE ENTRY ASSISTANT */
-
+/* SMART ENTRY CONFIRMATION SETTINGS */
+const ENTRY_RSI_BUY_MIN = 50;
+const ENTRY_RSI_SELL_MAX = 50;
 let entryScanVersion = 0;
 let entryScanTimer;
 
@@ -834,6 +836,7 @@ async function updateEntryAssistant() {
 
       const entry = Number(a.last);
       const volatility = Number(a.av);
+     const entryRSI = rsi(a.bars.map(b => b.close));
 
       const candleTime =
         a.bars[a.bars.length - 1].time;
@@ -845,7 +848,11 @@ async function updateEntryAssistant() {
           !Number.isFinite(volatility) ||
           volatility <= 0) continue;
 
-      const direction = bullish ? 'BUY' : 'SELL';
+      
+     if (!Number.isFinite(entryRSI)) continue;
+if (bullish && entryRSI < ENTRY_RSI_BUY_MIN) continue;
+if (bearish && entryRSI > ENTRY_RSI_SELL_MAX) continue;
+     const direction = bullish ? 'BUY' : 'SELL';
       const sign = bullish ? 1 : -1;
       const risk = volatility * 1.5;
 
