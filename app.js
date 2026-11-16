@@ -19,7 +19,7 @@ function connect() {
       setConnection(true, 'Deriv connected');
 
       socket.send(JSON.stringify({
-        active_symbols: 'brief',
+        active_symbols: 'full',
         req_id: 1
       }));
     };
